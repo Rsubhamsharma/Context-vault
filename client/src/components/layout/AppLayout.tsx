@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { Navbar } from './Navbar';
+import { Footer } from './Footer';
 import { motion } from 'framer-motion';
 
 export const AppLayout = ({ children }: { children: ReactNode }) => {
   return (
-    <div className="min-h-screen flex flex-col bg-stone-50">
+    <div className="min-h-screen flex flex-col bg-stone-50 dark:bg-stone-50">
       <Navbar />
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
@@ -15,6 +16,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
           {children}
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 };

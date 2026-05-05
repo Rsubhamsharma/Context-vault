@@ -16,5 +16,6 @@ router.delete('/:id', projectController.delete);
 router.post('/:projectId/context/updates', contextController.handleRawUpdate);
 router.get('/:projectId/context/latest', contextController.getLatestSnapshot);
 router.post('/:projectId/context/export', exportController.exportContext);
+router.post('/:projectId/context/restore', contextController.restoreVersion);
 
 export default router;
