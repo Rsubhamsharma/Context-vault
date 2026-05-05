@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --color-stone-50: #F8F6F2;
+  --color-stone-100: #EBE7DF;
+  --color-stone-200: #D6D0C5;
+  --color-stone-300: #BDB6A8;
+  --color-stone-400: #A39B8B;
+  --color-stone-500: #8B8273;
+  --color-stone-600: #73695B;
+  --color-stone-700: #5C5447;
+  --color-stone-800: #453D32;
+  --color-stone-900: #2D2720;
+
+  --color-primary: #1F2933;
+  --color-primary-foreground: #FFFFFF;
+
+  --color-accent: #D6A85A;
+  --color-accent-muted: #F3E8D2;
+  --color-accent-foreground: #FFFFFF;
+
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #F8F6F2;
+  --color-surface-border: #E5E1DA;
+
+  --color-text-primary: #1F2933;
+  --color-text-secondary: #6B7280;
+
+  --color-folder-tab: #E9DFC9;
+  --color-folder-tab-hover: #D9C49B;
+}
+
+.dark {
+  --color-stone-50: #0B1220;      /* App background */
+  --color-surface: #111827;       /* Dark surface (card/panel/folder body) */
+  --color-surface-elevated: #1A2233; /* Elevated surface */
+  --color-surface-border: #1F2937; /* Border */
+  
+  --color-primary: #E5E7EB;       /* Primary text/button bg */
+  --color-primary-foreground: #0B1220; /* Primary button text */
+  
+  --color-accent: #D6A85A;        /* Amber accent */
+  --color-accent-muted: #3B82F6;  /* Secondary accent (blue tint) */
+  --color-accent-foreground: #FFFFFF;
+  
+  --color-text-primary: #E5E7EB;  /* Text primary */
+  --color-text-secondary: #9CA3AF; /* Text secondary */
+
+  --color-folder-tab: #1A2233;    /* Folder tab */
+  --color-folder-tab-hover: #1F2937; /* Folder tab hover/active */
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-stone-50 text-text-primary antialiased;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+}
+
+.glass-card {
+  @apply bg-surface border border-surface-border shadow-sm rounded-2xl transition-all duration-200;
+}
+
+.btn-transition {
+  @apply transition-all duration-200 active:scale-95;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB; /* stone-300 */
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1F2937; /* surface-border */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
