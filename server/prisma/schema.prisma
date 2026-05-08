@@ -24,6 +24,7 @@ model Project {
   contextSnapshots ContextSnapshot[]
   contextUpdates   ContextUpdate[]
   exports          Export[]
+  smartExportCache SmartExportCache[]
   user             User              @relation(fields: [userId], references: [id])
 }
 
@@ -52,4 +53,25 @@ model Export {
   content   String
   createdAt DateTime @default(now())
   project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model SmartExportCache {
+  id                   String   @id @default(uuid())
+  projectId            String
+  versionNumber        Int
+  normalizedTask       String
+  originalTask         String
+  targetPlatform       String
+  exportText           String
+  characterCount       Int
+  estimatedTokens      Int
+  fullEstimatedTokens  Int
+  estimatedSavingsPercent Float?
+  relevanceMode        String
+  aiMetadata           Json
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  project              Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, versionNumber, normalizedTask, targetPlatform])
 }

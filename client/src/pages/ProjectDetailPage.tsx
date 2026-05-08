@@ -12,7 +12,7 @@ import { contextService } from '../services/context.service';
 import { exportService } from '../services/export.service';
 import { contextHistoryService } from '../services/contextHistory.service';
 import type { ProjectContext } from '../types/context.types';
-import type { ExportTarget, ExportMode, ExportResponse } from '../types/export.types';
+import type { ExportTarget, ExportMode, ExportResponse, ExportRequest } from '../types/export.types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Sparkles } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -134,8 +134,8 @@ export const ProjectDetailPage = () => {
 
 
   const exportMutation = useMutation({
-    mutationFn: ({ target, mode, task }: { target: ExportTarget; mode: ExportMode; task?: string }) =>
-      exportService.exportContext(projectId!, { target, mode, task }),
+    mutationFn: ({ request }: { request: ExportRequest }) =>
+      exportService.exportContext(projectId!, request),
     onSuccess: (res) => {
       setExportResult(res.data);
     },
@@ -475,14 +475,21 @@ export const ProjectDetailPage = () => {
             )}
 
             <div className="flex justify-end">
-              <Button
-                onClick={() => exportMutation.mutate({ target: selectedTarget, mode: selectedMode, task: selectedTask })}
-                isLoading={exportMutation.isPending}
-                disabled={selectedMode === 'smart' && !selectedTask.trim()}
-                className=""
-              >
-                Export
-              </Button>
+                <Button
+                  onClick={() => exportMutation.mutate({ 
+                    request: { 
+                      target: selectedTarget, 
+                      mode: selectedMode, 
+                      task: selectedTask,
+                      forceRegenerate: false 
+                    } 
+                  })}
+                  isLoading={exportMutation.isPending}
+                  disabled={selectedMode === 'smart' && !selectedTask.trim()}
+                  className=""
+                >
+                  Export
+                </Button>
             </div>
           
             <AnimatePresence>
@@ -492,32 +499,41 @@ export const ProjectDetailPage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-3"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-primary">
-                        Result ({exportResult.target} / {exportResult.mode})
-                      </span>
-                      {exportResult.relevanceMode === 'fallback' && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-[10px] font-medium text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                          Broad context (fallback)
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-primary">
+                          Result ({exportResult.target} / {exportResult.mode})
                         </span>
-                      )}
-                      {exportResult.aiMetadata?.confidence === 'low' && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-[10px] font-medium text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                          Ambiguous task (broad context)
-                        </span>
-                      )}
-                      <span className="px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-[10px] font-medium text-text-secondary border border-stone-200 dark:border-stone-700">
-                        ~{exportResult.estimatedTokens.toLocaleString()} tokens
-                      </span>
-                      {exportResult.mode !== 'full' && exportResult.estimatedSavingsPercent !== null && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                          Saved {exportResult.estimatedSavingsPercent}%
-                        </span>
-                      )}
+                        {exportResult.cacheStatus && (
+                          <span className="px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-[10px] font-medium text-text-secondary border border-stone-200 dark:border-stone-700">
+                            {exportResult.cacheStatus === 'hit' ? 'Cached' : exportResult.cacheStatus === 'regenerated' ? 'Regenerated' : exportResult.cacheStatus}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {exportResult.mode === 'smart' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              exportMutation.mutate({ 
+                                request: { 
+                                  target: exportResult.target, 
+                                  mode: 'smart', 
+                                  task: exportResult.originalTask || selectedTask,
+                                  forceRegenerate: true 
+                                } 
+                              });
+                            }}
+                            className="h-8 text-[11px] px-2"
+                          >
+                            Regenerate
+                          </Button>
+                        )}
+                        <CopyButton text={exportResult.content} />
+                      </div>
                     </div>
-                    <CopyButton text={exportResult.content} />
-                  </div>
+
                   <div className="p-4 bg-stone-900 text-stone-100 rounded-xl font-mono text-xs overflow-auto max-h-96 whitespace-pre-wrap border border-stone-800">
                     {exportResult.content}
                   </div>

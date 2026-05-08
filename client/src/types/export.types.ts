@@ -5,6 +5,7 @@ export interface ExportRequest {
   target: ExportTarget;
   mode?: ExportMode;
   task?: string;
+  forceRegenerate?: boolean;
 }
 
 export interface ExportResponse {
@@ -25,6 +26,8 @@ export interface ExportResponse {
       taskIntent?: string;
       [key: string]: unknown;
     };
+    cacheStatus?: 'hit' | 'miss' | 'regenerated' | 'none';
+    originalTask?: string;
   };
   message?: string;
 }
