@@ -20,6 +20,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { VersionTimeline } from '../components/timeline/VersionTimeline';
 import { VersionCompareView } from '../components/timeline/VersionCompareView';
+import { CleanupPreviewView } from '../components/timeline/CleanupPreviewView';
 import { ContextSearch } from '../components/vault/ContextSearch';
 
 import { VaultHeader } from '../components/vault/VaultHeader';
@@ -164,6 +165,7 @@ export const ProjectDetailPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['snapshot', projectId] });
       queryClient.invalidateQueries({ queryKey: ['history', projectId] });
+      cleanupPreviewMutation.reset();
       setIsCleanupOpen(false);
     },
   });
@@ -594,87 +596,82 @@ export const ProjectDetailPage = () => {
         {/* Cleanup Modal */}
         <Modal
           isOpen={isCleanupOpen}
-          onClose={() => setIsCleanupOpen(false)}
+          onClose={() => {
+            setIsCleanupOpen(false);
+            cleanupPreviewMutation.reset();
+          }}
           title="Clean Up Project Context"
           size="lg"
         >
-          <div className="max-w-4xl mx-auto bg-surface dark:bg-surface-elevated rounded-3xl border border-surface-border p-6 sm:p-10 space-y-8">
-            <div className="text-center space-y-2">
-              <p className="text-sm text-text-secondary leading-relaxed max-w-2xl mx-auto">
-                Clean and organize the latest context without deleting version history. 
-                Cleanup groups repeated details and preserves important project memory.
-              </p>
+          <div className="max-w-4xl mx-auto bg-surface dark:bg-surface-elevated rounded-3xl border border-surface-border p-6 sm:p-10 flex flex-col max-h-[90vh] overflow-hidden space-y-4">
+            <div className="text-center shrink-0">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-medium border border-accent/20">
                 <Sparkles className="w-3 h-3" />
                 Applying cleanup creates a new version
               </div>
             </div>
- 
-            {cleanupPreviewMutation.isPending ? (
-              <div className="flex items-center justify-center py-20">
-                <LoadingSpinner className="w-8 h-8" />
-                <span className="ml-3 text-sm text-text-secondary">Analyzing context for cleanup...</span>
-              </div>
-            ) : cleanupPreviewMutation.data ? (
-              <div className="space-y-8">
-                <div className="bg-stone-50/50 dark:bg-surface/50 rounded-3xl border border-surface-border p-4 sm:p-8 space-y-8">
-                  <div className="space-y-6">
-                    <VersionCompareView 
-                      variant="cleanup"
-                      projectId={projectId!} 
-                      versions={[
-                        { versionNumber: 0, createdAt: new Date().toISOString() }, 
-                        { versionNumber: 1, createdAt: new Date().toISOString() },
-                      ]} 
-                      initialFrom={0}
-                      initialTo={1}
-                      onClose={() => {}}
-                    />
-                    <div className="p-5 bg-white dark:bg-surface-elevated rounded-2xl border border-surface-border shadow-sm">
-                      <h4 className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-2">
-                        <Sparkles className="w-3 h-3 text-accent" />
-                        Cleanup Summary
-                      </h4>
-                      <ul className="text-xs text-text-secondary space-y-2 list-disc pl-4">
-                        <li>Grouped related features into high-level bullets</li>
-                        <li>Removed duplicate entries and noisy details</li>
-                        <li>Preserved all safety-critical constraints</li>
-                        <li>Normalized tech stack from dependencies/decisions</li>
-                      </ul>
+     
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
+              {cleanupPreviewMutation.isPending ? (
+                <div className="flex items-center justify-center py-20">
+                  <LoadingSpinner className="w-8 h-8" />
+                  <span className="ml-3 text-sm text-text-secondary">Analyzing context for cleanup...</span>
+                </div>
+              ) : cleanupPreviewMutation.data ? (
+                <div className="space-y-6">
+                  <CleanupPreviewView 
+                    before={cleanupPreviewMutation.data.data.before}
+                    after={cleanupPreviewMutation.data.data.after}
+                  />
+                  <div className="p-5 bg-white dark:bg-surface-elevated rounded-2xl border border-surface-border shadow-sm">
+                    <h4 className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-2">
+                      <Sparkles className="w-3 h-3 text-accent" />
+                      Cleanup Summary
+                    </h4>
+                    <ul className="text-xs text-text-secondary space-y-2 list-disc pl-4">
+                      <li>Grouped related features into high-level bullets</li>
+                      <li>Removed duplicate entries and noisy details</li>
+                      <li>Preserved all safety-critical constraints</li>
+                      <li>Normalized tech stack from dependencies/decisions</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 space-y-6">
+                  <div className="w-16 h-16 rounded-full bg-stone-100 dark:bg-surface-elevated flex items-center justify-center border border-surface-border">
+                    <Sparkles className="w-8 h-8 text-stone-400 dark:text-text-secondary" />
+                  </div>
+                  <div className="text-center space-y-2">
+                    <h3 className="text-base font-bold text-primary">Ready to optimize your context?</h3>
+                    <p className="text-sm text-text-secondary max-w-xs mx-auto">
+                      We'll analyze your current vault and suggest a cleaner, more organized version.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => cleanupPreviewMutation.mutate()} 
+                    isLoading={cleanupPreviewMutation.isPending}
+                    className="gap-2 px-6"
+                  >
+                    <Sparkles className="w-4 h-4" /> Generate Cleanup Preview
+                  </Button>
+                </div>
+              )}
+            </div>
+     
+            {cleanupPreviewMutation.data && (
+                    <div className="flex justify-end gap-3 pt-2 shrink-0 border-t border-surface-border dark:border-accent/10">
+                      <Button variant="ghost" onClick={() => {
+                        setIsCleanupOpen(false);
+                        cleanupPreviewMutation.reset();
+                      }}>Cancel</Button>
+                      <Button 
+                        onClick={() => applyCleanupMutation.mutate(cleanupPreviewMutation.data.data.after)}
+                        isLoading={applyCleanupMutation.isPending}
+                        className="gap-2"
+                      >
+                        <Sparkles className="w-4 h-4" /> Apply Cleanup
+                      </Button>
                     </div>
-                  </div>
-  
-                  <div className="flex justify-end gap-3 pt-2">
-                    <Button variant="ghost" onClick={() => setIsCleanupOpen(false)}>Cancel</Button>
-                    <Button 
-                      onClick={() => applyCleanupMutation.mutate(cleanupPreviewMutation.data.data.after)}
-                      isLoading={applyCleanupMutation.isPending}
-                      className="gap-2"
-                    >
-                      <Sparkles className="w-4 h-4" /> Apply Cleanup
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 space-y-6">
-                <div className="w-16 h-16 rounded-full bg-stone-100 dark:bg-surface-elevated flex items-center justify-center border border-surface-border">
-                  <Sparkles className="w-8 h-8 text-stone-400 dark:text-text-secondary" />
-                </div>
-                <div className="text-center space-y-2">
-                  <h3 className="text-base font-bold text-primary">Ready to optimize your context?</h3>
-                  <p className="text-sm text-text-secondary max-w-xs mx-auto">
-                    We'll analyze your current vault and suggest a cleaner, more organized version.
-                  </p>
-                </div>
-                <Button 
-                  onClick={() => cleanupPreviewMutation.mutate()} 
-                  isLoading={cleanupPreviewMutation.isPending}
-                  className="gap-2 px-6"
-                >
-                  <Sparkles className="w-4 h-4" /> Generate Cleanup Preview
-                </Button>
-              </div>
             )}
           </div>
         </Modal>

@@ -31,7 +31,9 @@ Mapping Rules:
     - Map "technologies/stack" to "tech_stack"
 * If input is a small update:
     - Map changes directly to the corresponding "added/made/found" fields.
-    - If project_goal or tech_stack are not mentioned, leave them as empty string/array.
+    - ONLY populate "project_goal" if the user explicitly states a change to the project's overall goal, purpose, or objective (e.g., "Change the goal to...", "New project goal:").
+    - DO NOT treat update headings, release titles, milestone names, or version markers (e.g., "Version 1.2 - In-Context Search") as the "project_goal".
+    - If project_goal or tech_stack are not explicitly changed, leave them as empty string/array.
 
 Extra Rules:
 * Do NOT return a "mode" field.
@@ -70,7 +72,8 @@ Normalize output to this exact schema:
 }
 
 Rules:
-* If the user only provided a project goal, populate project_goal.
+* ONLY populate "project_goal" if the user explicitly defines the overall purpose or goal of the project.
+* DO NOT treat update headings, release names, or version titles (e.g., "Version 1.0", "Milestone 2") as "project_goal".
 * If tech stack is mentioned, populate tech_stack.
 * Missing fields must be filled with empty arrays or empty string.
 * Do not hallucinate.

@@ -6,8 +6,19 @@ export function mergeContext(
   context: ProjectContext,
   update: ContextUpdate
 ): ProjectContext {
+  const isMilestone = (text: string) => {
+    const milestonePatterns = [
+      /^version\s+\d+(\.\d+)*\s*[-–:]/i,
+      /^v\d+(\.\d+)*\s*[-–:]/i,
+      /^completed\s+version/i,
+      /^release\s+\d+/i,
+      /^milestone\s+\d+/i
+    ];
+    return milestonePatterns.some(pattern => pattern.test(text));
+  };
+
   return {
-    project_goal: (update.project_goal && update.project_goal.trim().length > 0) 
+    project_goal: (update.project_goal && update.project_goal.trim().length > 0 && !isMilestone(update.project_goal)) 
       ? update.project_goal 
       : context.project_goal,
     tech_stack: unique([
