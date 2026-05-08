@@ -1,9 +1,13 @@
 import { GoogleGenAI } from '@google/genai';
 import { AIProvider, ContextUpdate } from '../ai-provider.interface';
+import { SmartExportAIOutput } from '../../export/smart-export.schema';
 import { env } from '../../../config/env';
 import { AppError } from '../../../middleware/error.middleware';
 import { AI_PROMPTS } from '../ai.prompts';
 import { contextUpdateSchema } from '../../context/context.schema';
+import { smartExportSchema } from '../../export/smart-export.schema';
+import { ProjectContext } from '../../context/context.types';
+import { projectContextSchema } from '../../context/context.schema';
 import { logger } from '../../../utils/logger';
 import { normalizeAIResponse } from '../ai-response-normalizer';
 
@@ -137,5 +141,67 @@ export class GeminiProvider implements AIProvider {
       if (error instanceof AppError) throw error;
       throw new AppError(500, `Gemini Provider Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  async extractSmartExportContext(task: string, fullContextJson: any): Promise<SmartExportAIOutput> {
+    const prompt = AI_PROMPTS.SMART_EXPORT(task, JSON.stringify(fullContextJson, null, 2));
+    
+    const response = await this.ai.models.generateContent({
+      model: env.GEMINI_MODEL_PRIMARY!,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new AppError(500, 'Gemini returned an empty response for smart export');
+    }
+
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new AppError(422, 'Smart export response is not valid JSON');
+    }
+
+    const validation = smartExportSchema.safeParse(json);
+    if (!validation.success) {
+      throw new AppError(422, 'Smart export response failed schema validation');
+    }
+
+    return validation.data;
+  }
+
+  async cleanupContext(currentContext: ProjectContext): Promise<ProjectContext> {
+    const prompt = AI_PROMPTS.CLEANUP_CONTEXT(JSON.stringify(currentContext, null, 2));
+    
+    const response = await this.ai.models.generateContent({
+      model: env.GEMINI_MODEL_PRIMARY!,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new AppError(500, 'Gemini returned an empty response for context cleanup');
+    }
+
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new AppError(422, 'Cleanup response is not valid JSON');
+    }
+
+    const validation = projectContextSchema.safeParse(json);
+    if (!validation.success) {
+      throw new AppError(422, 'Cleanup response failed schema validation');
+    }
+
+    return validation.data;
   }
 }

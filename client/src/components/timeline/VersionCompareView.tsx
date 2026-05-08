@@ -12,6 +12,7 @@ interface VersionCompareViewProps {
   initialFrom?: number;
   initialTo?: number;
   onClose?: () => void;
+  variant?: 'default' | 'cleanup';
 }
 
 export const VersionCompareView = ({ 
@@ -19,7 +20,8 @@ export const VersionCompareView = ({
   versions, 
   initialFrom, 
   initialTo,
-  onClose 
+  onClose,
+  variant = 'default'
 }: VersionCompareViewProps) => {
   const [fromVersion, setFromVersion] = useState<number | undefined>(initialFrom);
   const [toVersion, setToVersion] = useState<number | undefined>(initialTo);
@@ -61,8 +63,14 @@ export const VersionCompareView = ({
             <GitCompare className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-primary dark:text-text-primary">Version Comparison</h2>
-            {fromVersion && toVersion ? (
+            <h2 className="text-base font-bold text-primary dark:text-text-primary">
+              {variant === 'cleanup' ? 'Cleanup Preview' : 'Version Comparison'}
+            </h2>
+            {variant === 'cleanup' ? (
+              <p className="text-xs text-text-secondary dark:text-text-secondary font-medium">
+                Review how the latest context will be organized before applying cleanup.
+              </p>
+            ) : fromVersion && toVersion ? (
               <p className="text-xs text-text-secondary dark:text-text-secondary font-medium">
                 Comparing <span className="text-accent">v{fromVersion}</span> with <span className="text-accent">v{toVersion}</span>
               </p>
@@ -72,26 +80,28 @@ export const VersionCompareView = ({
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setShowSelectors(!showSelectors)}
-            className="p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-surface text-stone-400 dark:text-text-secondary transition-colors"
-            title="Manual Selection"
-          >
-            {showSelectors ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 dark:text-text-secondary dark:hover:bg-surface">
-              <span className="sr-only">Close</span>
-              ×
-            </Button>
-          )}
-        </div>
+        {variant !== 'cleanup' && (
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowSelectors(!showSelectors)}
+              className="p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-surface text-stone-400 dark:text-text-secondary transition-colors"
+              title="Manual Selection"
+            >
+              {showSelectors ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            {onClose && (
+              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 dark:text-text-secondary dark:hover:bg-surface">
+                <span className="sr-only">Close</span>
+                ×
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Manual Selection Fallback */}
       <AnimatePresence>
-        {showSelectors && (
+        {variant !== 'cleanup' && showSelectors && (
           <motion.div 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -187,7 +197,7 @@ export const VersionCompareView = ({
                 added={diffData.decisions?.added} 
                 removed={diffData.decisions?.removed} 
                 delay={0.3}
-              />
+                />
 
               <DiffSection 
                 title="Active Issues" 
@@ -240,28 +250,28 @@ export const VersionCompareView = ({
               )}
             </motion.div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-full bg-stone-50 dark:bg-surface-elevated flex items-center justify-center mb-6">
-                <History className="w-8 h-8 text-stone-300 dark:text-text-secondary/50" />
-              </div>
-              <h3 className="text-lg font-bold text-primary dark:text-text-primary mb-2">Select versions to compare</h3>
-              <p className="text-sm text-text-secondary dark:text-text-secondary max-w-xs mx-auto mb-8">
-                Use the timeline actions or the manual selectors above to start comparing history snapshots.
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowSelectors(true)}
-                className="gap-2 dark:border-surface-border dark:text-text-secondary dark:hover:bg-surface-elevated"
-              >
-                <GitCompare className="w-4 h-4" />
-                Select Versions
-              </Button>
-            </div>
+            variant === 'cleanup' ? null : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                 <div className="w-10 h-10 rounded-full bg-stone-50 dark:bg-surface-elevated flex items-center justify-center mb-3">
+                   <History className="w-5 h-5 text-stone-300 dark:text-text-secondary/50" />
+                 </div>
+                 <h3 className="text-sm font-bold text-primary dark:text-text-primary mb-1">Select versions to compare</h3>
+                 <p className="text-xs text-text-secondary dark:text-text-scondary max-w-xs mx-auto mb-4">
+                   Use the timeline actions or the manual selectors above to start comparing history snapshots.
+                 </p>
+                 <Button 
+                   variant="ghost" 
+                   onClick={() => setShowSelectors(true)}
+                   className="gap-2 h-7 px-3 text-[11px] dark:text-text-secondary dark:hover:bg-surface-elevated"
+                 >
+                   <GitCompare className="w-3 h-3" />
+                   Select Versions
+                 </Button>
+               </div>
+             )
           )}
         </AnimatePresence>
       </div>
-
     </div>
   );
 };
-

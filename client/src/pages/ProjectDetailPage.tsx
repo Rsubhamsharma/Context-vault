@@ -12,9 +12,9 @@ import { contextService } from '../services/context.service';
 import { exportService } from '../services/export.service';
 import { contextHistoryService } from '../services/contextHistory.service';
 import type { ProjectContext } from '../types/context.types';
-import type { ExportTarget } from '../types/export.types';
+import type { ExportTarget, ExportMode, ExportResponse } from '../types/export.types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap } from 'lucide-react';
+import { Zap, Sparkles } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -42,9 +42,12 @@ export const ProjectDetailPage = () => {
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isCleanupOpen, setIsCleanupOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
-  const [exportResult, setExportResult] = useState<{ target: string; content: string } | null>(null);
+  const [exportResult, setExportResult] = useState<ExportResponse['data'] | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<ExportTarget>('chatgpt');
+  const [selectedMode, setSelectedMode] = useState<ExportMode>('full');
+  const [selectedTask, setSelectedTask] = useState<string>('');
   
   const [isRestoreOpen, setIsRestoreOpen] = useState(false);
   const [restoreVersion, setRestoreVersion] = useState<number | null>(null);
@@ -117,10 +120,10 @@ export const ProjectDetailPage = () => {
 
 
   const exportMutation = useMutation({
-    mutationFn: (target: ExportTarget) =>
-      exportService.exportContext(projectId!, { target }),
+    mutationFn: ({ target, mode, task }: { target: ExportTarget; mode: ExportMode; task?: string }) =>
+      exportService.exportContext(projectId!, { target, mode, task }),
     onSuccess: (res) => {
-      setExportResult({ target: res.data.target, content: res.data.content });
+      setExportResult(res.data);
     },
   });
 
@@ -132,6 +135,23 @@ export const ProjectDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: ['history', projectId] });
       setIsRestoreOpen(false);
       setRestoreVersion(null);
+    },
+  });
+
+  const cleanupPreviewMutation = useMutation({
+    mutationFn: () => contextService.previewCleanup(projectId!),
+    onSuccess: () => {
+      // Result is stored in mutation data, can be accessed in UI
+    },
+  });
+
+  const applyCleanupMutation = useMutation({
+    mutationFn: (cleanedContext: ProjectContext) =>
+      contextService.applyCleanup(projectId!, cleanedContext),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['snapshot', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['history', projectId] });
+      setIsCleanupOpen(false);
     },
   });
 
@@ -192,13 +212,15 @@ export const ProjectDetailPage = () => {
           currentVersion={currentVersion}
           onRefresh={() => queryClient.invalidateQueries({ queryKey: ['history', projectId] })}
           onExport={() => setIsExportOpen(true)}
+          onCleanup={() => setIsCleanupOpen(true)}
            onAddUpdate={() => {
-             setUpdateError(null);
-             setIsUpdateOpen(true);
-           }}
+            setUpdateError(null);
+            setIsUpdateOpen(true);
+          }}
            onDelete={() => setIsDeleteOpen(true)}
           hasContext={!!currentContext}
         />
+
 
         {!currentContext ? (
           <motion.div 
@@ -323,10 +345,10 @@ export const ProjectDetailPage = () => {
                     <div className="lg:col-span-7 h-full">
                       <VersionCompareView 
                         projectId={projectId!} 
-                        versions={historyData?.data?.map(v => ({ 
-                          versionNumber: v.versionNumber, 
-                          createdAt: v.createdAt 
-                        })) || []} 
+                      versions={historyData?.data?.map(v => ({ 
+                        versionNumber: v.versionNumber, 
+                        createdAt: (v.createdAt as any).toISOString ? (v.createdAt as any).toISOString() : String(v.createdAt) 
+                      })) || []} 
                         initialFrom={compareVersions?.from}
                         initialTo={compareVersions?.to}
                         onClose={() => setCompareVersions(null)}
@@ -370,63 +392,133 @@ export const ProjectDetailPage = () => {
         </form>
       </Modal>
 
-       {/* Export Modal */}
-       <Modal
-         isOpen={isExportOpen}
-         onClose={() => {
-           setIsExportOpen(false);
-           setExportResult(null);
-         }}
-         title="Export Project Context"
-         size="lg"
-       >
-         <div className="space-y-6">
-           <div className="flex flex-col sm:flex-row items-end gap-4">
-             <div className="flex-1 w-full">
-               <label className="text-sm font-medium text-primary mb-1.5 block">Export Target</label>
-               <select
-                 value={selectedTarget}
-                 onChange={(e) => setSelectedTarget(e.target.value as ExportTarget)}
-                 className="w-full h-10 rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
-               >
-                 <option value="chatgpt">ChatGPT</option>
-                 <option value="claude">Claude</option>
-                 <option value="cursor">Cursor</option>
-                 <option value="windsurf">Windsurf</option>
-                 <option value="generic_markdown">Generic Markdown</option>
-                 <option value="json">JSON</option>
-               </select>
-             </div>
-             <Button
-               onClick={() => exportMutation.mutate(selectedTarget)}
-               isLoading={exportMutation.isPending}
-               className=""
-             >
-               Export
-             </Button>
-           </div>
-         
-           <AnimatePresence>
-             {exportResult && (
-               <motion.div
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 className="space-y-3"
-               >
-                 <div className="flex items-center justify-between">
-                   <span className="text-sm font-medium text-primary">
-                     Result ({exportResult.target})
-                   </span>
-                   <CopyButton text={exportResult.content} />
-                 </div>
-                 <div className="p-4 bg-stone-900 text-stone-100 rounded-xl font-mono text-xs overflow-auto max-h-96 whitespace-pre-wrap border border-stone-800">
-                   {exportResult.content}
-                 </div>
-               </motion.div>
-             )}
-           </AnimatePresence>
-         </div>
-       </Modal>
+        {/* Export Modal */}
+        <Modal
+          isOpen={isExportOpen}
+          onClose={() => {
+            setIsExportOpen(false);
+            setExportResult(null);
+          }}
+          title="Export Project Context"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+              <div className="w-full">
+                <label className="text-sm font-medium text-primary mb-1.5 block">Export Target</label>
+                <select
+                  value={selectedTarget}
+                  onChange={(e) => setSelectedTarget(e.target.value as ExportTarget)}
+                  className="w-full h-10 rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                >
+                  <option value="chatgpt">ChatGPT</option>
+                  <option value="claude">Claude</option>
+                  <option value="cursor">Cursor</option>
+                  <option value="windsurf">Windsurf</option>
+                  <option value="generic_markdown">Generic Markdown</option>
+                  <option value="json">JSON</option>
+                </select>
+              </div>
+              <div className="w-full">
+                <label className="text-sm font-medium text-primary mb-1.5 block">Export Mode</label>
+                <select
+                  value={selectedMode}
+                  onChange={(e) => setSelectedMode(e.target.value as ExportMode)}
+                  className="w-full h-10 rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                >
+                  <option value="full">Full Export (Complete context)</option>
+                  <option value="compact">Compact Export (Essential state)</option>
+                  <option value="smart">Smart Export (Task-optimized)</option>
+                </select>
+              </div>
+            </div>
+
+            {selectedMode === 'smart' && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-1.5"
+              >
+                <label className="text-sm font-medium text-primary block">What are you working on?</label>
+                <input
+                  type="text"
+                  value={selectedTask}
+                  onChange={(e) => setSelectedTask(e.target.value)}
+                  placeholder="e.g. Add GitHub integration, Fix context search..."
+                  className="w-full h-10 rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                />
+              </motion.div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => exportMutation.mutate({ target: selectedTarget, mode: selectedMode, task: selectedTask })}
+                isLoading={exportMutation.isPending}
+                disabled={selectedMode === 'smart' && !selectedTask.trim()}
+                className=""
+              >
+                Export
+              </Button>
+            </div>
+          
+            <AnimatePresence>
+              {exportResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-primary">
+                        Result ({exportResult.target} / {exportResult.mode})
+                      </span>
+                      {exportResult.relevanceMode === 'fallback' && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-[10px] font-medium text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                          Broad context (fallback)
+                        </span>
+                      )}
+                      {exportResult.aiMetadata?.confidence === 'low' && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-[10px] font-medium text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                          Ambiguous task (broad context)
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-[10px] font-medium text-text-secondary border border-stone-200 dark:border-stone-700">
+                        ~{exportResult.estimatedTokens.toLocaleString()} tokens
+                      </span>
+                      {exportResult.mode !== 'full' && exportResult.estimatedSavingsPercent !== null && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                          Saved {exportResult.estimatedSavingsPercent}%
+                        </span>
+                      )}
+                    </div>
+                    <CopyButton text={exportResult.content} />
+                  </div>
+                  <div className="p-4 bg-stone-900 text-stone-100 rounded-xl font-mono text-xs overflow-auto max-h-96 whitespace-pre-wrap border border-stone-800">
+                    {exportResult.content}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-2">
+                    <div className="p-2 rounded-lg bg-surface border border-surface-border">
+                      <p className="text-[10px] text-text-secondary uppercase font-bold">Full Mode</p>
+                      <p className="text-xs font-medium text-primary">~{exportResult.fullEstimatedTokens.toLocaleString()} tokens</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-surface border border-surface-border">
+                      <p className="text-[10px] text-text-secondary uppercase font-bold">Compact Mode</p>
+                      <p className="text-xs font-medium text-primary">~{exportResult.compactEstimatedTokens.toLocaleString()} tokens</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-surface border border-surface-border col-span-2 sm:col-span-1">
+                      <p className="text-[10px] text-text-secondary uppercase font-bold">Characters</p>
+                      <p className="text-xs font-medium text-primary">{exportResult.characterCount.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </Modal>
+
+
 
        {/* Restore Version Modal */}
        <Modal
@@ -469,14 +561,103 @@ export const ProjectDetailPage = () => {
          </div>
        </Modal>
 
-       {/* Delete Confirmation Modal */}
-       <DeleteConfirmation
-         isOpen={isDeleteOpen}
-         onClose={() => setIsDeleteOpen(false)}
-         onConfirm={() => deleteMutation.mutate()}
-         projectName={project.name}
-         isLoading={deleteMutation.isPending}
-       />
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmation
+          isOpen={isDeleteOpen}
+          onClose={() => setIsDeleteOpen(false)}
+          onConfirm={() => deleteMutation.mutate()}
+          projectName={project.name}
+          isLoading={deleteMutation.isPending}
+        />
+
+        {/* Cleanup Modal */}
+        <Modal
+          isOpen={isCleanupOpen}
+          onClose={() => setIsCleanupOpen(false)}
+          title="Clean Up Project Context"
+          size="lg"
+        >
+          <div className="max-w-4xl mx-auto bg-surface dark:bg-surface-elevated rounded-3xl border border-surface-border p-6 sm:p-10 space-y-8">
+            <div className="text-center space-y-2">
+              <p className="text-sm text-text-secondary leading-relaxed max-w-2xl mx-auto">
+                Clean and organize the latest context without deleting version history. 
+                Cleanup groups repeated details and preserves important project memory.
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-medium border border-accent/20">
+                <Sparkles className="w-3 h-3" />
+                Applying cleanup creates a new version
+              </div>
+            </div>
+ 
+            {cleanupPreviewMutation.isPending ? (
+              <div className="flex items-center justify-center py-20">
+                <LoadingSpinner className="w-8 h-8" />
+                <span className="ml-3 text-sm text-text-secondary">Analyzing context for cleanup...</span>
+              </div>
+            ) : cleanupPreviewMutation.data ? (
+              <div className="space-y-8">
+                <div className="bg-stone-50/50 dark:bg-surface/50 rounded-3xl border border-surface-border p-4 sm:p-8 space-y-8">
+                  <div className="space-y-6">
+                    <VersionCompareView 
+                      variant="cleanup"
+                      projectId={projectId!} 
+                      versions={[
+                        { versionNumber: 0, createdAt: new Date().toISOString() }, 
+                        { versionNumber: 1, createdAt: new Date().toISOString() },
+                      ]} 
+                      initialFrom={0}
+                      initialTo={1}
+                      onClose={() => {}}
+                    />
+                    <div className="p-5 bg-white dark:bg-surface-elevated rounded-2xl border border-surface-border shadow-sm">
+                      <h4 className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-2">
+                        <Sparkles className="w-3 h-3 text-accent" />
+                        Cleanup Summary
+                      </h4>
+                      <ul className="text-xs text-text-secondary space-y-2 list-disc pl-4">
+                        <li>Grouped related features into high-level bullets</li>
+                        <li>Removed duplicate entries and noisy details</li>
+                        <li>Preserved all safety-critical constraints</li>
+                        <li>Normalized tech stack from dependencies/decisions</li>
+                      </ul>
+                    </div>
+                  </div>
+  
+                  <div className="flex justify-end gap-3 pt-2">
+                    <Button variant="ghost" onClick={() => setIsCleanupOpen(false)}>Cancel</Button>
+                    <Button 
+                      onClick={() => applyCleanupMutation.mutate(cleanupPreviewMutation.data.data.after)}
+                      isLoading={applyCleanupMutation.isPending}
+                      className="gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" /> Apply Cleanup
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 space-y-6">
+                <div className="w-16 h-16 rounded-full bg-stone-100 dark:bg-surface-elevated flex items-center justify-center border border-surface-border">
+                  <Sparkles className="w-8 h-8 text-stone-400 dark:text-text-secondary" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-base font-bold text-primary">Ready to optimize your context?</h3>
+                  <p className="text-sm text-text-secondary max-w-xs mx-auto">
+                    We'll analyze your current vault and suggest a cleaner, more organized version.
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => cleanupPreviewMutation.mutate()} 
+                  isLoading={cleanupPreviewMutation.isPending}
+                  className="gap-2 px-6"
+                >
+                  <Sparkles className="w-4 h-4" /> Generate Cleanup Preview
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
+
      </AppLayout>
    );
  };

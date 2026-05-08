@@ -1,4 +1,4 @@
-import { ArrowLeft, RefreshCw, Download, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, Plus, Trash2, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ interface VaultHeaderProps {
   onExport: () => void;
   onAddUpdate: () => void;
   onDelete: () => void;
+  onCleanup: () => void;
   hasContext: boolean;
 }
 
@@ -21,6 +22,7 @@ export const VaultHeader = ({
   onExport,
   onAddUpdate,
   onDelete,
+  onCleanup,
   hasContext,
 }: VaultHeaderProps) => {
   const navigate = useNavigate();
@@ -55,13 +57,22 @@ export const VaultHeader = ({
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
         {hasContext && (
-          <Button 
-            variant="outline" 
-            onClick={onExport} 
-            className="gap-2 bg-white dark:bg-surface-elevated border-surface-border dark:border-accent/10 text-primary dark:text-text-primary shadow-sm hover:bg-stone-50 dark:hover:bg-surface transition-all"
-          >
-            <Download className="w-4 h-4" /> Export
-          </Button>
+          <>
+            <Button 
+              variant="outline" 
+              onClick={onCleanup} 
+              className="gap-2 bg-white dark:bg-surface-elevated border-surface-border dark:border-accent/10 text-primary dark:text-text-primary shadow-sm hover:bg-stone-50 dark:hover:bg-surface transition-all"
+            >
+              <Sparkles className="w-4 h-4" /> Clean Up
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={onExport} 
+              className="gap-2 bg-white dark:bg-surface-elevated border-surface-border dark:border-accent/10 text-primary dark:text-text-primary shadow-sm hover:bg-stone-50 dark:hover:bg-surface transition-all"
+            >
+              <Download className="w-4 h-4" /> Export
+            </Button>
+          </>
         )}
         <Button 
           onClick={onAddUpdate} 

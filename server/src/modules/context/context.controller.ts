@@ -1,10 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { contextService } from './context.service';
 import { createSnapshotSchema, createUpdateSchema, projectContextSchema, restoreVersionSchema } from './context.schema';
+import { cleanupPreviewSchema, cleanupApplySchema } from './cleanup.schema';
 import { sendResponse } from '../../utils/response';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { computeContextDiff } from './diff-utility';
- 
+  
 export class ContextController {
   async createSnapshot(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -15,7 +16,7 @@ export class ContextController {
       next(error);
     }
   }
- 
+  
   async createUpdate(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const validatedData = createUpdateSchema.parse(req.body);
@@ -25,7 +26,7 @@ export class ContextController {
       next(error);
     }
   }
- 
+  
   async handleRawUpdate(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { projectId } = req.params;
@@ -37,7 +38,7 @@ export class ContextController {
       next(error);
     }
   }
- 
+  
   async getLatestSnapshot(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { projectId } = req.params;
@@ -47,7 +48,7 @@ export class ContextController {
       next(error);
     }
   }
-
+ 
   async getContextHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { projectId } = req.params;
@@ -57,7 +58,7 @@ export class ContextController {
       next(error);
     }
   }
-
+ 
   async getDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { projectId } = req.params;
@@ -89,7 +90,7 @@ export class ContextController {
       next(error);
     }
   }
-
+ 
   async restoreVersion(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { projectId } = req.params;
@@ -102,7 +103,32 @@ export class ContextController {
       next(error);
     }
   }
-}
 
+  async previewCleanup(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { projectId } = req.params;
+      const validatedData = cleanupPreviewSchema.parse(req.body);
+      
+      const preview = await contextService.previewCleanup(req.user!.id, projectId);
+      return sendResponse(res, 200, preview, 'Cleanup preview generated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async applyCleanup(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { projectId } = req.params;
+      const validatedData = cleanupApplySchema.parse(req.body);
+      
+      const result = await contextService.applyCleanup(req.user!.id, projectId, validatedData.cleanedContext);
+      return sendResponse(res, 200, result, 'Context cleanup applied successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+}
  
+  
 export const contextController = new ContextController();
+

@@ -11,17 +11,17 @@ import { AppError } from '../../middleware/error.middleware';
 import { mergeContext } from './context-merger';
 import { ProjectContext, ContextUpdate } from './context.types';
 import { aiService } from '../ai/ai.service';
- 
+
 export class ContextService {
   async createSnapshot(userId: string, data: z.infer<typeof createSnapshotSchema>) {
     const project = await prisma.project.findFirst({
       where: { id: data.projectId, userId },
     });
- 
+  
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
- 
+  
     return prisma.contextSnapshot.create({ 
       data: {
         projectId: data.projectId,
@@ -30,16 +30,16 @@ export class ContextService {
       }
     });
   }
- 
+  
   async createUpdate(userId: string, data: z.infer<typeof createUpdateSchema>) {
     const project = await prisma.project.findFirst({
       where: { id: data.projectId, userId },
     });
- 
+  
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
- 
+  
     // This is where AI extraction logic would go (e.g. calling aiService.extractContext)
     return prisma.contextUpdate.create({
       data: {
@@ -49,7 +49,7 @@ export class ContextService {
       },
     });
   }
- 
+  
   async applyUpdate(userId: string, projectId: string, update: ContextUpdate, tx?: any) {
     const prismaClient = tx || prisma;
     const project = await prismaClient.project.findFirst({
@@ -91,50 +91,52 @@ export class ContextService {
       },
     });
   }
- 
+  
   async getSnapshotByVersion(userId: string, projectId: string, versionNumber: number) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
     });
-
+ {
+  }
+ 
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
-
+ 
     return prisma.contextSnapshot.findFirst({
       where: { projectId, versionNumber },
     });
   }
-
+ 
   async getLatestSnapshot(userId: string, projectId: string) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
     });
- 
+  
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
- 
+  
     return prisma.contextSnapshot.findFirst({
       where: { projectId },
       orderBy: { versionNumber: 'desc' },
     });
   }
- 
+  
   async getContextHistory(userId: string, projectId: string) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
     });
- 
+  
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
- 
+  
     const snapshots = await prisma.contextSnapshot.findMany({
       where: { projectId },
       orderBy: { versionNumber: 'desc' },
     });
- 
+  
     // For each snapshot, try to find the corresponding update
     // Since the system creates a snapshot immediately after an update,
     // we can look for the update created around the same time or
@@ -158,10 +160,10 @@ export class ContextService {
         update: update ? { extractedUpdateJson: update.extractedUpdateJson } : null,
       };
     }));
- 
+  
     return history;
   }
- 
+  
   async processRawUpdate(userId: string, projectId: string, rawInput: string) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
@@ -195,34 +197,36 @@ export class ContextService {
       };
     });
   }
-
+ 
   async restoreVersion(userId: string, projectId: string, versionNumber: number) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
     });
-
+ {
+}
+ 
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
-
+ 
     const snapshotToRestore = await prisma.contextSnapshot.findFirst({
       where: { projectId, versionNumber },
     });
-
+ 
     if (!snapshotToRestore) {
       throw new AppError(404, 'Snapshot version not found');
     }
-
+ 
     // Validate contextJson
     projectContextSchema.parse(snapshotToRestore.contextJson);
-
+ 
     const latestSnapshot = await prisma.contextSnapshot.findFirst({
       where: { projectId },
       orderBy: { versionNumber: 'desc' },
     });
-
+ 
     const newVersionNumber = latestSnapshot ? latestSnapshot.versionNumber + 1 : 1;
-
+ 
     const newSnapshot = await prisma.contextSnapshot.create({
       data: {
         projectId,
@@ -230,13 +234,50 @@ export class ContextService {
         contextJson: snapshotToRestore.contextJson as any,
       },
     });
-
+ 
     return {
       restoredFromVersion: versionNumber,
       snapshot: newSnapshot,
     };
   }
-}
 
+  async previewCleanup(userId: string, projectId: string) {
+    const latestSnapshot = await this.getLatestSnapshot(userId, projectId);
+    if (!latestSnapshot) {
+      throw new AppError(404, 'No context snapshot found for this project');
+    }
+
+    const currentContext = projectContextSchema.parse(latestSnapshot.contextJson) as ProjectContext;
+    const cleanedContext = await aiService.cleanupContext(currentContext);
+
+    return {
+      before: currentContext,
+      after: cleanedContext,
+    };
+  }
+
+  async applyCleanup(userId: string, projectId: string, cleanedContext: ProjectContext) {
+    // Validate cleaned context again before applying
+    projectContextSchema.parse(cleanedContext);
+
+    const latestSnapshot = await this.getLatestSnapshot(userId, projectId);
+    const newVersionNumber = latestSnapshot ? latestSnapshot.versionNumber + 1 : 1;
+
+    const newSnapshot = await prisma.contextSnapshot.create({
+      data: {
+        projectId,
+        versionNumber: newVersionNumber,
+        contextJson: cleanedContext as any,
+      },
+    });
+
+    return {
+      snapshot: newSnapshot,
+      message: 'Context cleanup applied and new version created',
+    };
+  }
+}
  
+  
 export const contextService = new ContextService();
+
