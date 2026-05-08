@@ -20,6 +20,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { VersionTimeline } from '../components/timeline/VersionTimeline';
 import { VersionCompareView } from '../components/timeline/VersionCompareView';
+import { ContextSearch } from '../components/vault/ContextSearch';
 
 import { VaultHeader } from '../components/vault/VaultHeader';
 import { MemorySectionNav } from '../components/vault/MemorySectionNav';
@@ -96,6 +97,18 @@ export const ProjectDetailPage = () => {
   const handleRestoreVersion = (version: number) => {
     setRestoreVersion(version);
     setIsRestoreOpen(true);
+  };
+
+  const handleJumpToSection = (sectionId: string) => {
+    setActiveSection(sectionId as SectionType);
+    
+    // Scroll after the section has been rendered in the DOM
+    setTimeout(() => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 0);
   };
 
   const updateMutation = useMutation({
@@ -206,7 +219,7 @@ export const ProjectDetailPage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto pb-12">
         <VaultHeader 
           project={project}
           currentVersion={currentVersion}
@@ -253,10 +266,18 @@ export const ProjectDetailPage = () => {
               />
             </div>
             
-            <div className="md:col-span-9">
+             <div className="md:col-span-9 space-y-4">
+               <div className={`flex justify-end ${activeSection === 'history' ? 'mb-2' : '-mb-2'}`}>
+                 <ContextSearch 
+                   context={currentContext} 
+                   history={historyData?.data || []}
+                   onJumpToSection={handleJumpToSection} 
+                   onVersionSelect={handleVersionSelect}
+                 />
+               </div>
               <AnimatePresence mode="wait">
                 {activeSection === 'overview' && (
-                  <MemorySectionPanel title="Overview">
+                  <MemorySectionPanel title="Overview" id="overview">
                     <SectionBlock title="Project Goal">
                       <p className="text-primary leading-relaxed">
                         {currentContext.project_goal || <span className="text-text-secondary italic">Not specified yet.</span>}
@@ -267,9 +288,9 @@ export const ProjectDetailPage = () => {
                     </SectionBlock>
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'features' && (
-                  <MemorySectionPanel title="Features" isEmpty={counts.features === 0}>
+                  <MemorySectionPanel title="Features" isEmpty={counts.features === 0} id="features">
                     {currentContext.features?.length > 0 && (
                       <SectionBlock title="Active Features">
                         <FolderList items={currentContext.features} bulletColor="bg-accent" />
@@ -282,17 +303,17 @@ export const ProjectDetailPage = () => {
                     )}
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'decisions' && (
-                  <MemorySectionPanel title="Decisions" isEmpty={counts.decisions === 0}>
+                  <MemorySectionPanel title="Decisions" isEmpty={counts.decisions === 0} id="decisions">
                     <SectionBlock title="Important Decisions">
                       <FolderList items={currentContext.decisions} />
                     </SectionBlock>
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'issues' && (
-                  <MemorySectionPanel title="Issues" isEmpty={counts.issues === 0}>
+                  <MemorySectionPanel title="Issues" isEmpty={counts.issues === 0} id="issues">
                     {currentContext.current_issues?.length > 0 && (
                       <SectionBlock title="Current Issues">
                         <FolderList items={currentContext.current_issues} bulletColor="bg-red-400" />
@@ -305,31 +326,31 @@ export const ProjectDetailPage = () => {
                     )}
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'dependencies' && (
-                  <MemorySectionPanel title="Dependencies" isEmpty={counts.dependencies === 0}>
+                  <MemorySectionPanel title="Dependencies" isEmpty={counts.dependencies === 0} id="dependencies">
                     <SectionBlock title="Dependencies">
                       <FolderList items={currentContext.dependencies} />
                     </SectionBlock>
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'constraints' && (
-                  <MemorySectionPanel title="Constraints" isEmpty={counts.constraints === 0}>
+                  <MemorySectionPanel title="Constraints" isEmpty={counts.constraints === 0} id="constraints">
                     <SectionBlock title="Important Constraints">
                       <FolderList items={currentContext.important_constraints} bulletColor="bg-stone-200 dark:bg-surface-border" />
                     </SectionBlock>
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'next_steps' && (
-                  <MemorySectionPanel title="Next Steps" isEmpty={counts.next_steps === 0}>
+                  <MemorySectionPanel title="Next Steps" isEmpty={counts.next_steps === 0} id="next_steps">
                     <SectionBlock title="Next Steps">
                       <FolderList items={currentContext.next_steps} bulletColor="bg-primary" />
                     </SectionBlock>
                   </MemorySectionPanel>
                 )}
-
+                
                 {activeSection === 'history' && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     <div className="lg:col-span-5 border-r border-surface-border/50 pr-4 lg:sticky lg:top-8 max-h-[70vh] lg:max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
@@ -345,10 +366,10 @@ export const ProjectDetailPage = () => {
                     <div className="lg:col-span-7 h-full">
                       <VersionCompareView 
                         projectId={projectId!} 
-                      versions={historyData?.data?.map(v => ({ 
-                        versionNumber: v.versionNumber, 
-                        createdAt: (v.createdAt as any).toISOString ? (v.createdAt as any).toISOString() : String(v.createdAt) 
-                      })) || []} 
+                        versions={historyData?.data?.map(v => ({ 
+                          versionNumber: v.versionNumber, 
+                          createdAt: (v.createdAt as any).toISOString ? (v.createdAt as any).toISOString() : String(v.createdAt) 
+                        })) || []} 
                         initialFrom={compareVersions?.from}
                         initialTo={compareVersions?.to}
                         onClose={() => setCompareVersions(null)}

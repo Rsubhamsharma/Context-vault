@@ -5,11 +5,13 @@ interface MemorySectionPanelProps {
   title: string;
   children: ReactNode;
   isEmpty?: boolean;
+  id?: string;
 }
 
-export const MemorySectionPanel = ({ title, children, isEmpty }: MemorySectionPanelProps) => {
+export const MemorySectionPanel = ({ title, children, isEmpty, id }: MemorySectionPanelProps) => {
   return (
     <motion.div
+      id={id}
       key={title}
       initial={{ opacity: 0, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
