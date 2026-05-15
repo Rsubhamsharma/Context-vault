@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -8,6 +8,7 @@ import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
 import { projectService } from '../services/project.service';
+import { authService } from '../services/auth.service';
 import { Plus, Archive, Search, ArrowUpDown } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +16,8 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { FolderCard } from '../components/vault/FolderCard';
 import { DeleteConfirmation } from '../components/vault/DeleteConfirmation';
+import { OnboardingModal } from '../components/onboarding/OnboardingModal';
+import { GuidedProjectSetup } from '../components/vault/GuidedProjectSetup';
 import type { Project } from '../types/project.types';
 
 const projectSchema = z.object({
@@ -40,9 +43,34 @@ export const DashboardPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGuidedSetupOpen, setIsGuidedSetupOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('newest');
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  const { data: userData, isLoading: userLoading } = useQuery({
+    queryKey: ['user-me'],
+    queryFn: () => authService.getMe(),
+  });
+
+  useEffect(() => {
+    if (userData?.data && !userData.data.onboardingCompleted) {
+      setIsOnboardingOpen(true);
+    }
+  }, [userData]);
+
+  const handleOnboardingComplete = async () => {
+    try {
+      await authService.updateOnboarding(true);
+      queryClient.invalidateQueries({ queryKey: ['user-me'] });
+      setIsOnboardingOpen(false);
+    } catch (error) {
+      console.error('Failed to update onboarding status:', error);
+      // Still close modal to avoid blocking user, but log error
+      setIsOnboardingOpen(false);
+    }
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['projects'],
@@ -103,7 +131,7 @@ export const DashboardPage = () => {
     });
   }, [data, searchQuery, sortOption]);
 
-  if (isLoading) {
+  if (isLoading || userLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-[60vh]">
@@ -180,22 +208,23 @@ export const DashboardPage = () => {
               </div>
             </div>
             
-            {!hasProjects ? (
-              <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="max-w-md w-full bg-surface dark:bg-surface-elevated text-center py-12 px-8 rounded-xl border border-surface-border dark:border-accent/20 shadow-sm">
-                  <div className="w-12 h-12 rounded-full bg-stone-50 dark:bg-surface flex items-center justify-center mx-auto mb-6 border border-surface-border/50 dark:border-accent/10">
-                    <Archive className="w-6 h-6 text-stone-400 dark:text-accent" />
-                  </div>
-                  <h2 className="text-xl font-bold text-primary mb-3">No vaults found</h2>
-                  <p className="text-sm text-text-secondary mb-8 leading-relaxed">
-                    Context Vault helps you maintain structured memory across AI tools. Create your first vault to get started.
-                  </p>
-                  <Button onClick={() => setIsModalOpen(true)} className="w-full gap-2 shadow-sm">
-                    Create New Vault
-                  </Button>
-                </div>
-              </div>
-            ) : !hasFilteredProjects ? (
+             {!hasProjects ? (
+               <div className="flex flex-col items-center justify-center py-20 px-4">
+                 <div className="max-w-md w-full bg-surface dark:bg-surface-elevated text-center py-12 px-8 rounded-xl border border-surface-border dark:border-accent/20 shadow-sm">
+                   <div className="w-12 h-12 rounded-full bg-stone-50 dark:bg-surface flex items-center justify-center mx-auto mb-6 border border-surface-border/50 dark:border-accent/10">
+                     <Archive className="w-6 h-6 text-stone-400 dark:text-accent" />
+                   </div>
+                   <h2 className="text-xl font-bold text-primary mb-3">No vaults found</h2>
+                   <p className="text-sm text-text-secondary mb-8 leading-relaxed">
+                     Context Vault helps you maintain structured memory across AI tools. Create your first vault to get started.
+                   </p>
+                   <Button onClick={() => setIsGuidedSetupOpen(true)} className="w-full gap-2 shadow-sm bg-indigo-600 text-white hover:bg-indigo-700">
+                     Create First Vault
+                   </Button>
+                 </div>
+               </div>
+             ) : !hasFilteredProjects ? (
+
               <div className="flex flex-col items-center justify-center py-20 px-4">
                 <div className="max-w-md w-full bg-surface dark:bg-surface-elevated text-center py-12 px-8 rounded-xl border border-surface-border dark:border-accent/20 shadow-sm">
                   <div className="w-12 h-12 rounded-full bg-stone-50 dark:bg-surface flex items-center justify-center mx-auto mb-6 border border-surface-border/50 dark:border-accent/10">
@@ -253,6 +282,22 @@ export const DashboardPage = () => {
           </div>
         </form>
       </Modal>
+
+      <GuidedProjectSetup 
+        isOpen={isGuidedSetupOpen} 
+        onClose={() => setIsGuidedSetupOpen(false)} 
+        onSuccess={(projectId) => {
+          setIsGuidedSetupOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
+          navigate(`/project/${projectId}`);
+        }}
+      />
+
+      <OnboardingModal 
+        isOpen={isOnboardingOpen} 
+        onClose={() => setIsOnboardingOpen(false)} 
+        onComplete={handleOnboardingComplete} 
+      />
 
       {/* Delete Confirmation Modal */}
       {projectToDelete && (

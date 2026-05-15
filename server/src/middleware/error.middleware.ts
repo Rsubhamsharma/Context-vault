@@ -16,9 +16,13 @@ export const errorMiddleware = (
   next: NextFunction
 ) => {
   const statusCode = err instanceof AppError ? err.statusCode : 500;
-  const message = err instanceof Error ? err.message : 'Internal Server Error';
+  
+  // In production, hide internal error messages for 500 errors
+  const message = (process.env.NODE_ENV === 'production' && statusCode === 500)
+    ? 'An internal server error occurred. Please try again later.'
+    : (err instanceof Error ? err.message : 'Internal Server Error');
 
-  logger.error(`[Error] ${req.method} ${req.url} - ${message}`);
+  logger.error(`[Error] ${req.method} ${req.url} - ${err instanceof Error ? err.message : 'Unknown Error'}`);
 
   return sendResponse(res, statusCode, null, message);
 };

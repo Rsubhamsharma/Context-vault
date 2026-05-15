@@ -53,6 +53,39 @@ export class AuthService {
       token,
     };
   }
+
+  async getMe(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        onboardingCompleted: true,
+        onboardingCompletedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError(404, 'User not found');
+    }
+
+    return user;
+  }
+
+  async updateOnboardingStatus(userId: string, completed: boolean) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        onboardingCompleted: completed,
+        onboardingCompletedAt: completed ? new Date() : null,
+      },
+      select: {
+        id: true,
+        onboardingCompleted: true,
+        onboardingCompletedAt: true,
+      },
+    });
+  }
 }
 
 export const authService = new AuthService();

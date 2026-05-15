@@ -35,7 +35,7 @@ export class ExportService {
     }
 
     const mode = request.mode || 'full';
-    let content: string;
+    let content: string | undefined;
     let relevanceMode: 'ai' | 'fallback' | 'none' = 'none';
     let aiMetadata: any = null;
     let cacheStatus: 'hit' | 'miss' | 'regenerated' | 'none' = 'none';
@@ -153,6 +153,10 @@ export class ExportService {
       }
     } else {
       content = exportFormatter.format(project.name, validation.data, request.target, mode);
+    }
+    
+    if (!content) {
+      throw new AppError(500, 'Failed to generate export content');
     }
     
     const fullContent = exportFormatter.format(project.name, validation.data, request.target, 'full');

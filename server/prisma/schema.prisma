@@ -8,11 +8,13 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  createdAt DateTime  @default(now())
-  projects  Project[]
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  password             String
+  createdAt            DateTime  @default(now())
+  onboardingCompleted  Boolean   @default(false)
+  onboardingCompletedAt DateTime?
+  projects             Project[]
 }
 
 model Project {
@@ -25,8 +27,40 @@ model Project {
   contextUpdates   ContextUpdate[]
   exports          Export[]
   smartExportCache SmartExportCache[]
+  gitChangeImports GitChangeImport[]
+  githubIntegrations GitHubIntegration[]
   user             User              @relation(fields: [userId], references: [id])
 }
+
+model GitHubIntegration {
+  id                   String    @id @default(uuid())
+  projectId            String    @unique
+  userId               String
+  repoOwner            String?
+  repoName             String?
+  repoFullName         String?
+  repoUrl              String?
+  defaultBranch        String?
+  selectedBranch       String?
+  installationId       String
+  githubAccountId      String?
+  githubAccountLogin    String?
+  accessTokenEncrypted   String?
+  permissionsSummary   String?
+  isActive             Boolean   @default(true)
+  connectedAt          DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  lastSyncedCommitSha  String?
+  project              Project   @relation(fields: [projectId], references: [id])
+}
+
+model GitHubInstallState {
+  state     String   @id
+  projectId String
+  userId    String
+  expiresAt DateTime
+}
+
 
 model ContextSnapshot {
   id            String   @id @default(uuid())
@@ -74,4 +108,26 @@ model SmartExportCache {
   project              Project  @relation(fields: [projectId], references: [id])
 
   @@unique([projectId, versionNumber, normalizedTask, targetPlatform])
+}
+
+model GitChangeImport {
+  id                    String   @id @default(uuid())
+  projectId             String
+  userId                String
+  title                 String?
+  changeType            String
+  branch                String?
+  baseBranch            String?
+  sanitizedInputPreview String?
+  rawInputHash          String?
+  suggestedUpdateJson   Json?
+  redactionCount        Int      @default(0)
+  status                String   // analyzed, applied, cancelled, failed
+  createdVersionId      String?
+  errorMessage          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  appliedAt             DateTime?
+  preprocessingMetadata Json?
+  project               Project  @relation(fields: [projectId], references: [id])
 }

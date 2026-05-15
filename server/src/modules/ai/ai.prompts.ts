@@ -49,6 +49,74 @@ Extra Rules:
 
 {{input}} 
 `,
+  GIT_CHANGE_ANALYSIS: (gitData: { 
+    title?: string, 
+    changeType: string, 
+    branch?: string, 
+    baseBranch?: string, 
+    changeText: string,
+    preprocessingMetadata?: any
+  }) => `
+You are an expert software architect and Git change analyzer. Your task is to analyze Git-related change information and convert it into a suggested Project Context update.
+
+INPUT DATA:
+- Change Type: ${gitData.changeType}
+- Title: ${gitData.title || 'Not provided'}
+- Branch: ${gitData.branch || 'Not provided'}
+- Base Branch: ${gitData.baseBranch || 'Not provided'}
+- Preprocessing Note: ${gitData.preprocessingMetadata ? `Input has been preprocessed. ${gitData.preprocessingMetadata.ignoredFiles?.length || 0} noisy files were excluded and ${gitData.preprocessingMetadata.redactionCount || 0} secrets were redacted.` : 'Raw input provided.'}
+- Change Text:
+<<<
+${gitData.changeText}
+>>>
+
+OUTPUT FORMAT:
+You MUST return exactly this JSON structure:
+{
+  "features_added": string[],
+  "features_removed": string[],
+  "decisions_made": string[],
+  "issues_found": string[],
+  "issues_resolved": string[],
+  "dependencies_added": string[],
+  "constraints_added": string[],
+  "next_steps": string[],
+  "project_goal": string,
+  "tech_stack": string[]
+}
+
+STRICT ANALYSIS RULES:
+1. COMPLETION STATUS (CRITICAL):
+   - If branch is main, master, or develop, or if changeType is "release_notes", treat the changes as completed/implemented.
+   - If branch is a feature branch (e.g., feature/...), treat changes as "Detected work on [branch]" or "In-progress".
+   - If changeType is "pull_request" and it's not explicitly stated as merged, treat it as "Proposed" or "In-progress".
+   - Do NOT claim a feature is complete if it is only a proposal or on an unmerged branch.
+
+2. CONTENT MAPPING:
+   - New features implemented -> features_added
+   - Explicitly removed/deprecated features -> features_removed
+   - Architectural or design choices -> decisions_made
+   - New bugs or risks identified in the change -> issues_found
+   - Fixed bugs described in the change -> issues_resolved
+   - New libraries/frameworks added -> dependencies_added
+   - New technical or business constraints -> constraints_added
+   - Suggested follow-up work -> next_steps
+
+3. SAFETY & INTEGRITY:
+   - Do NOT invent features.
+   - Do NOT change "project_goal" unless the text explicitly describes a fundamental shift in the project's overall purpose.
+   - Do NOT treat file names alone as proof of completed product behavior.
+   - Keep updates concise and factual.
+   - Return JSON only. No conversational filler.
+
+4. LARGE INPUT HANDLING:
+   - Be aware that some noisy or risky files may have been removed during preprocessing.
+   - If the input seems truncated or summarized, focus on the high-signal changes provided.
+   - Do not hallucinate content that was explicitly ignored.
+
+5. FALLBACK:
+   - If the input is too vague to extract structured data, return empty arrays/strings but do not hallucinate.
+`,
   buildRepairPrompt: (rawInput: string, aiOutput: string): string => `
 You are a strict JSON repair and normalization engine.
 
@@ -209,4 +277,3 @@ STRICT CLEANUP RULES:
    - Do not hallucinate.
 `,
 };
-

@@ -1,24 +1,15 @@
 import api from '../lib/api';
-import type { ContextUpdateRequest, ContextUpdateResponseData, ContextSnapshot, ApiResponse, ProjectContext } from '../types/context.types';
-
-export interface RestoreVersionRequest {
-  versionNumber: number;
-}
-
-export interface RestoreVersionResponseData {
-  restoredFromVersion: number;
-  snapshot: ContextSnapshot;
-}
-
-export interface CleanupPreviewResponseData {
-  before: ProjectContext;
-  after: ProjectContext;
-}
-
-export interface CleanupApplyResponseData {
-  snapshot: ContextSnapshot;
-  message: string;
-}
+import type { 
+  ContextUpdateRequest, 
+  ContextUpdateResponseData, 
+  ContextSnapshot, 
+  ApiResponse, 
+  ProjectContext,
+  RestoreVersionRequest,
+  RestoreVersionResponseData,
+  CleanupPreviewResponseData,
+  CleanupApplyResponseData
+} from '../types/context.types';
 
 export const contextService = {
   async getLatestSnapshot(projectId: string): Promise<ApiResponse<ContextSnapshot | null>> {
@@ -43,5 +34,21 @@ export const contextService = {
       cleanedContext,
     });
     return response.data as ApiResponse<CleanupApplyResponseData>;
+  },
+  async analyzeGitImport(projectId: string, data: any): Promise<ApiResponse<any>> {
+    const response = await api.post(`/projects/${projectId}/git-import/analyze`, data);
+    return response.data as ApiResponse<any>;
+  },
+  async applyGitImport(projectId: string, data: any): Promise<ApiResponse<any>> {
+    const response = await api.post(`/projects/${projectId}/git-import/apply`, data);
+    return response.data as ApiResponse<any>;
+  },
+  async updateGitImportStatus(projectId: string, gitImportId: string, status: string): Promise<ApiResponse<any>> {
+    const response = await api.patch(`/projects/${projectId}/git-import/${gitImportId}/status`, { status });
+    return response.data as ApiResponse<any>;
+  },
+  async getGitImportHistory(projectId: string): Promise<ApiResponse<any[]>> {
+    const response = await api.get(`/projects/${projectId}/git-import/history`);
+    return response.data as ApiResponse<any[]>;
   },
 };

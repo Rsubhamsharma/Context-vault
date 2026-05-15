@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '../components/layout/AppLayout';
 import { Button } from '../components/ui/Button';
@@ -29,6 +29,9 @@ import type { SectionType } from '../components/vault/MemorySectionNav';
 import { MemorySectionPanel, FolderList, SectionBlock } from '../components/vault/MemorySectionPanel';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { DeleteConfirmation } from '../components/vault/DeleteConfirmation';
+import { GitImportModal } from '../components/vault/GitImportModal';
+import { GitHubIntegrationModal } from '../components/vault/GitHubIntegrationModal';
+import { githubService } from '../services/github.service';
 
 const updateSchema = z.object({
   rawInput: z.string().min(10, 'Input must be at least 10 characters'),
@@ -39,13 +42,17 @@ type UpdateFormValues = z.infer<typeof updateSchema>;
 export const ProjectDetailPage = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCleanupOpen, setIsCleanupOpen] = useState(false);
+  const [isGitImportOpen, setIsGitImportOpen] = useState(false);
+  const [isGitHubOpen, setIsGitHubOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [githubError, setGithubError] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<ExportResponse['data'] | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<ExportTarget>('chatgpt');
   const [selectedMode, setSelectedMode] = useState<ExportMode>('full');
@@ -70,6 +77,42 @@ export const ProjectDetailPage = () => {
     queryFn: () => contextHistoryService.getHistory(projectId!),
     enabled: !!projectId,
   });
+
+  const { data: githubStatusData } = useQuery({
+    queryKey: ['github-integration-status', projectId],
+    queryFn: () => githubService.getIntegrationStatus(projectId!),
+    enabled: !!projectId,
+    retry: 0,
+  });
+
+  useEffect(() => {
+    const githubStatus = searchParams.get('github');
+    if (!githubStatus) return;
+
+    if (['connected', 'select_repo', 'no_repositories'].includes(githubStatus)) {
+      setIsGitHubOpen(true);
+      setGithubError(null);
+      queryClient.invalidateQueries({ queryKey: ['github-integration-status', projectId] });
+      return;
+    }
+
+    const githubErrorMessages: Record<string, string> = {
+      state_expired: 'GitHub authorization expired. Please reconnect GitHub.',
+      installation_missing: 'GitHub did not return an installation. Please try connecting again.',
+      project_ownership_failed: 'GitHub authorization could not be linked to this project.',
+      app_auth_failed: 'GitHub App authentication failed. Check backend GitHub App configuration.',
+      installation_token_failed: 'GitHub authorization could not be verified. Please reconnect GitHub.',
+      repo_fetch_failed: 'Could not load repositories from GitHub. Please update repository access or reconnect.',
+      integration_save_failed: 'GitHub was authorized, but the connection could not be saved. Please try again.',
+    };
+
+    const message = githubErrorMessages[githubStatus];
+    if (message) {
+      setGithubError(message);
+      setIsGitHubOpen(true);
+      queryClient.invalidateQueries({ queryKey: ['github-integration-status', projectId] });
+    }
+  }, [searchParams, projectId, queryClient]);
 
   useEffect(() => {
     if (historyData?.data && historyData.data.length > 0) {
@@ -170,6 +213,52 @@ export const ProjectDetailPage = () => {
     },
   });
 
+  const analyzeGitImportMutation = useMutation({
+    mutationFn: (data: any) => contextService.analyzeGitImport(projectId!, data),
+    onSuccess: () => {
+      // Result is stored in mutation data
+    },
+  });
+
+  const handleAnalyzeGitHubChange = async (summary: string) => {
+    // Determine change type from summary
+    const isPR = summary.includes('Pull Request Change');
+    const changeType = isPR ? 'pull_request' : 'commit';
+    
+    // Extract title (first line after the header)
+    const lines = summary.split('\n');
+    const titleLine = lines.find(l => l.startsWith('Title:') || l.startsWith('Message:')) || 'GitHub Change';
+    const title = titleLine.split(':')[1]?.trim() || 'GitHub Change';
+    
+    // Extract branch
+    const branchLine = lines.find(l => l.startsWith('Branch:')) || '';
+    const branch = branchLine.split(':')[1]?.trim() || '';
+    
+    // Extract raw text (everything from the header onwards)
+    const changeText = summary;
+
+    try {
+      await analyzeGitImportMutation.mutateAsync({
+        title,
+        changeType,
+        branch,
+        changeText,
+      });
+      setIsGitImportOpen(true);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const applyGitImportMutation = useMutation({
+
+    mutationFn: (data: any) => contextService.applyGitImport(projectId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['snapshot', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['history', projectId] });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => projectService.deleteProject(projectId!),
     onSuccess: () => {
@@ -222,19 +311,24 @@ export const ProjectDetailPage = () => {
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto pb-12">
-        <VaultHeader 
-          project={project}
-          currentVersion={currentVersion}
-          onRefresh={() => queryClient.invalidateQueries({ queryKey: ['history', projectId] })}
-          onExport={() => setIsExportOpen(true)}
-          onCleanup={() => setIsCleanupOpen(true)}
-           onAddUpdate={() => {
-            setUpdateError(null);
-            setIsUpdateOpen(true);
-          }}
-           onDelete={() => setIsDeleteOpen(true)}
-          hasContext={!!currentContext}
-        />
+          <VaultHeader 
+            project={project}
+            currentVersion={currentVersion}
+            onRefresh={() => queryClient.invalidateQueries({ queryKey: ['history', projectId] })}
+            onExport={() => setIsExportOpen(true)}
+            onCleanup={() => setIsCleanupOpen(true)}
+             onAddUpdate={() => {
+              setUpdateError(null);
+              setIsUpdateOpen(true);
+            }}
+             onImportGitChanges={() => setIsGitImportOpen(true)}
+             onConnectGitHub={() => setIsGitHubOpen(true)}
+             onDelete={() => setIsDeleteOpen(true)}
+            hasContext={!!currentContext}
+            githubStatus={githubStatusData?.data}
+          />
+
+
 
 
         {!currentContext ? (
@@ -609,6 +703,33 @@ export const ProjectDetailPage = () => {
           isLoading={deleteMutation.isPending}
         />
 
+        <GitImportModal
+          isOpen={isGitImportOpen}
+          onClose={() => {
+            setIsGitImportOpen(false);
+            analyzeGitImportMutation.reset();
+          }}
+          projectId={projectId!}
+          onApplySuccess={() => {
+            setIsGitImportOpen(false);
+          }}
+          analyzeMutation={analyzeGitImportMutation}
+          applyMutation={applyGitImportMutation}
+        />
+
+          <GitHubIntegrationModal
+            isOpen={isGitHubOpen}
+            onClose={() => {
+              setIsGitHubOpen(false);
+              setGithubError(null);
+            }}
+            projectId={projectId!}
+            initialError={githubError}
+            onClearError={() => setGithubError(null)}
+            onAnalyzeGitHubChange={handleAnalyzeGitHubChange}
+          />
+
+
         {/* Cleanup Modal */}
         <Modal
           isOpen={isCleanupOpen}
@@ -695,4 +816,3 @@ export const ProjectDetailPage = () => {
      </AppLayout>
    );
  };
-

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,11 +20,13 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const SignupPage = () => {
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
   });
 
   const onSubmit = async (data: SignupFormValues) => {
+    setError(null);
     try {
       const response = await authService.register(data);
       if (response.success) {
@@ -31,8 +34,8 @@ export const SignupPage = () => {
         auth.setUser(response.data.user);
         navigate('/dashboard');
       }
-    } catch {
-      alert('Signup failed. Please try again.');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Signup failed. Please try again.');
     }
   };
 
@@ -50,6 +53,11 @@ export const SignupPage = () => {
           </div>
           <Card>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs text-center">
+                  {error}
+                </div>
+              )}
               <Input
                 label="Email"
                 {...register('email')}

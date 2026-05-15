@@ -8,10 +8,21 @@ yarn-error.log*
 
 # Environment
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p8
+*.p12
+*.crt
+*.cert
+*.der
+private-key*
+github-app-private-key*
+service-account*.json
+credentials*.json
+token*.json
 
 # Build
 dist/
@@ -32,10 +43,14 @@ logs/
 *.log
 
 # Database
-# Keep migrations, but ignore sqlite db if used
 *.db
 *.db-journal
+*.sqlite
 
 # Project specific
 client/dist/
 server/dist/
+.cache/
+.vite/
+coverage/
+

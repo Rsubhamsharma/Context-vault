@@ -29,6 +29,7 @@ export interface ApiResponse<T> {
 
 export interface ContextUpdateRequest {
   rawInput: string;
+  skipAI?: boolean;
 }
 
 export interface ContextUpdateResponseData {
@@ -43,6 +44,25 @@ export interface ContextUpdateResponseData {
     next_steps: string[];
   };
   snapshot: ContextSnapshot;
+}
+
+export interface RestoreVersionRequest {
+  versionNumber: number;
+}
+
+export interface RestoreVersionResponseData {
+  restoredFromVersion: number;
+  snapshot: ContextSnapshot;
+}
+
+export interface CleanupPreviewResponseData {
+  before: ProjectContext;
+  after: ProjectContext;
+}
+
+export interface CleanupApplyResponseData {
+  snapshot: ContextSnapshot;
+  message: string;
 }
 
 export interface ArrayDiff {
